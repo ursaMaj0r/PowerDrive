@@ -31,7 +31,7 @@ function Invoke-PowerDriveAnalysis
         $fileName = $sample.VersionInfo.FileName
         Write-Output "Attempting to Deobfuscate $fileName with PowerDrive"
         $results = PowerDrive -InputFile $FileName 
-        Export-Csv -InputObject $results -Path $outputFile -NoTypeInformation -Append -Force
+        $results | Select-Object * | Export-Csv -Path $outputFile -NoTypeInformation -Append -Force
 
     }
 }
