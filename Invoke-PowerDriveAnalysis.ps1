@@ -35,4 +35,3 @@ function Invoke-PowerDriveAnalysis
 
     }
 }
-Invoke-PowerDriveAnalysis -malwareDirectory $malwareDirectory -outputFile $outputFile
