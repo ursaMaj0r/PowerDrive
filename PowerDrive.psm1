@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Obfuscated PowerShell Script Deobfuscator
+    Obfuscated PowerShell Script Deobfuscator. Updated by Jeff Malavasi.
 .DESCRIPTION
 	This PowerShell Script allows to deobfuscate PowerShell Scripts that have been previously obfuscated. These obfuscation process can be several layers deep. The Script 
 	runs iteratively deobfuscating each layer and finaly gets the Url where the malware is hosted. The main method used by the Script is called funtcion overwriting. With 
@@ -41,70 +41,83 @@ function Invoke-Expression() {
 # FUNCTIONS #
 #############
 
-function GetObfuscatedScriptFromFile() {
+function GetObfuscatedScriptFromFile()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [PSObject[]]$InputFile
-    )
+		[PSObject[]]$InputFile
+	)
 	
-    try {
+	try
+ {
 		$FileEncoding = GetFileEncoding $InputFile
-		if($FileEncoding -eq "ascii") {
+		if ($FileEncoding -eq "ascii")
+		{
 			$FileContent = Get-Content $InputFile -ErrorAction Stop
 		}
-		else {
+		else
+		{
 			$FileContent = Get-Content $InputFile -Encoding UTF8 -ErrorAction Stop
 		}
-		foreach($line in $FileContent) {
+		foreach ($line in $FileContent)
+		{
 			$ObfuscatedScript += $line
 		}
 	}
-    catch {
+	catch
+	{
 		throw "Error reading: '$($InputFile)'"
 	}
 	
 	return $ObfuscatedScript
 }
 
-function GetFileEncoding() {
+function GetFileEncoding()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [PSObject[]]$InputObject
-    )
+		[PSObject[]]$InputObject
+	)
 	
 	[byte[]]$Bytes = Get-Content -Encoding byte -ReadCount 4 -TotalCount 4 -Path $InputObject
 	
-	if($Bytes[0] -eq 0xef -and $Bytes[1] -eq 0xbb -and $Bytes[2] -eq 0xbf) {
+	if ($Bytes[0] -eq 0xef -and $Bytes[1] -eq 0xbb -and $Bytes[2] -eq 0xbf)
+ {
 		return "utf8"
 	}
-	else {
+	else
+	{
 		return "ascii"
 	}
 }
 
-function IsBase64() {
+function IsBase64()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$InputString
-    )
+		[string]$InputString
+	)
 	
-	if($InputString -Match "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$") {
+	if ($InputString -Match "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$")
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function DecodeBase64() {
+function DecodeBase64()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$StringBase64
-    )
+		[string]$StringBase64
+	)
 	
 	
 	$DecodedString = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($StringBase64))
@@ -112,12 +125,13 @@ function DecodeBase64() {
 	return $DecodedString
 }
 
-function ScriptToOneLine() {
+function ScriptToOneLine()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [array]$ObfuscatedScript
-    )
+		[array]$ObfuscatedScript
+	)
 	
 	<#
 	.DESCRIPTION
@@ -128,19 +142,21 @@ function ScriptToOneLine() {
 	#>
 	
 	$ObfuscatedScriptInOneLine = ""
-	ForEach($line in $ObfuscatedScript) {
+	ForEach ($line in $ObfuscatedScript)
+	{
 		$ObfuscatedScriptInOneLine += $line -replace "`n", "" -replace "`r", ""
 	}
 	
 	return $ObfuscatedScriptInOneLine
 }
 
-function CleanScript() {
+function CleanScript()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	<#
 	.DESCRIPTION
@@ -150,77 +166,88 @@ function CleanScript() {
 	Cleaned obfuscated script.
 	#>
 	
-	if(ThereAreNonCompatibleAsciiCharacters $ObfuscatedScript) {
+	if (ThereAreNonCompatibleAsciiCharacters $ObfuscatedScript)
+ {
 		$ObfuscatedScript = RemoveNonAsciiCharacters $ObfuscatedScript
 	}
-	if(EscapeCharactersWithBadFormat $ObfuscatedScript) {
+	if (EscapeCharactersWithBadFormat $ObfuscatedScript)
+	{
 		$ObfuscatedScript = RemoveEscapeCharactersWithBadFormat $ObfuscatedScript
 	}
 	
 	return $ObfuscatedScript
 }
 
-function ThereAreNonCompatibleAsciiCharacters() {
+function ThereAreNonCompatibleAsciiCharacters()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$RegexMatch = [Regex]::Match($ObfuscatedScript, "(?!\r|\n|\t)[\x00-\x1f\x7f-\xff]")
-	if($RegexMatch.Success) {
+	if ($RegexMatch.Success)
+	{
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function RemoveNonAsciiCharacters() {
+function RemoveNonAsciiCharacters()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$ObfuscatedScript = $ObfuscatedScript -replace "[^\x00-\x7e]+", ""
 	
 	return $ObfuscatedScript
 }
 
-function EscapeCharactersWithBadFormat() {
+function EscapeCharactersWithBadFormat()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
-	if($ObfuscatedScript -Match '\"') {
+	if ($ObfuscatedScript -Match '\"')
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function RemoveEscapeCharactersWithBadFormat() {
+function RemoveEscapeCharactersWithBadFormat()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 		
 	$ObfuscatedScript = $ObfuscatedScript -replace '\\"', "'"
 	
 	return $ObfuscatedScript
 }
 
-function GoodSyntax() {
+function GoodSyntax()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	<#
 	.DESCRIPTION
@@ -236,12 +263,13 @@ function GoodSyntax() {
 	return [bool]($Errors.Count -lt 1)
 }
 
-function UsesFileExplorer() {
+function UsesFileExplorer()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	<#
 	.DESCRIPTION
@@ -254,20 +282,23 @@ function UsesFileExplorer() {
 	
 	$RegexMatch = [Regex]::Match($ObfuscatedScript, "explorer\.exe ")
 	
-	if($RegexMatch.Success) {
+	if ($RegexMatch.Success)
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function ExtractUrls() {
+function ExtractUrls()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$Script
-    )
+		[string]$Script
+	)
 	
 	<#
 	.DESCRIPTION
@@ -281,8 +312,10 @@ function ExtractUrls() {
 	$Url = ""
 	$Pattern = "(((http|https):\/\/)|www\.?)(.*?)(\""|\'|\})"
 	$Regex = [Regex]::Matches($Script, $Pattern)
-	Foreach($Group in $Regex.Groups) {
-		if($Group.Name -eq 0) {
+	Foreach ($Group in $Regex.Groups)
+	{
+		if ($Group.Name -eq 0)
+		{
 			$Url = $Group.Value
 			$Url = $Url.SubString(0, $Url.Length - 1)
 			$Urls += $Url
@@ -292,66 +325,113 @@ function ExtractUrls() {
 	return $Urls
 }
 
-function IsUrlActive() {
+function IsUrlActive()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$Url
-    )
+		[string]$Url
+	)
 	
 	$HTTP_Request = [System.Net.WebRequest]::Create($Url)
-	try {
+	try
+	{
 		$HTTP_Response = $HTTP_Request.GetResponse()
 	}
-	catch [Net.WebException] {
+	catch [Net.WebException]
+	{
 		return $False
 	}
 	$HTTP_Status = [int]$HTTP_Response.StatusCode
 	
-	if($HTTP_Status -eq 200) {
+	if ($HTTP_Status -eq 200)
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function ContainsSleepCommand() {
+function ContainsSleepCommand()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
-	if($ObfuscatedScript -Match "sleep") {
+	if ($ObfuscatedScript -Match "sleep")
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function ReduceSleepCounter() {
+function ContainsDownload()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
+	
+	if ($ObfuscatedScript -Match "download")
+ {
+		return $True
+	}
+	else
+	{
+		return $False
+	}
+}
+
+function ContainsProcess()
+{
+	param(
+		[Parameter(
+			Mandatory = $True)]
+		[string]$ObfuscatedScript
+	)
+	
+	if ($ObfuscatedScript -Match "process")
+ {
+		return $True
+	}
+	else
+	{
+		return $False
+	}
+}
+
+function ReduceSleepCounter()
+{
+	param(
+		[Parameter(
+			Mandatory = $True)]
+		[string]$ObfuscatedScript
+	)
 	
 	$RegexMatch = [Regex]::Match($ObfuscatedScript, "(.*?)(?i)sleep (.*?)\;(.*?)\z")
-	if($RegexMatch.Success) {
+	if ($RegexMatch.Success)
+	{
 		$ObfuscatedScript = $RegexMatch.Groups[1].Value + " sleep 1;" + $RegexMatch.Groups[3].Value
 	}
 	
 	return $ObfuscatedScript
 }
 
-function ThereIsNullOutputRedirection() {
+function ThereIsNullOutputRedirection()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	<#
 	.DESCRIPTION
@@ -362,20 +442,23 @@ function ThereIsNullOutputRedirection() {
 	#>
 	
 	$RegexMatch = [Regex]::Match($ObfuscatedScript, "(?i)out-null")
-	if($RegexMatch.Success) {
+	if ($RegexMatch.Success)
+	{
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function RemoveOutputHiding() {
+function RemoveOutputHiding()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	<#
 	.DESCRIPTION
@@ -387,8 +470,10 @@ function RemoveOutputHiding() {
 	
 	$ObfuscatedScriptWithoutOutputHiding = ""
 	$RegexMatch = [Regex]::Match($ObfuscatedScript, "(.*?)\|\s*(?i)out-null\s*(.*?)\z")
-	Foreach($Group in $RegexMatch.Groups) {
-		if($Group.Name -ne 0) {
+	Foreach ($Group in $RegexMatch.Groups)
+	{
+		if ($Group.Name -ne 0)
+		{
 			$ObfuscatedScriptWithoutOutputHiding += $Group.Value
 		}
 	}
@@ -396,35 +481,41 @@ function RemoveOutputHiding() {
 	return $ObfuscatedScriptWithoutOutputHiding
 }
 
-function ContainsEndlessLoopType1() {
+function ContainsEndlessLoopType1()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$Regex = [Regex]::Match($ObfuscatedScript, "do\s*\{(.*?)\}\s*(i?)while\s*\(\!\$\?\)")
-	if($Regex.Success) {
+	if ($Regex.Success)
+	{
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 	
 	return $Found
 }
 
-function RemoveEndlessLoopType1() {
+function RemoveEndlessLoopType1()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$ObfuscatedScriptWithoutEndlessLoops = ""
 	$Regex = [Regex]::Match($ObfuscatedScript, "(.*?)do\s*\{(.*?)\}\s*(i?)while\s*\(\!\$\?\)(.*?)\z")
-	Foreach($Group in $Regex.Groups) {
-		if($Group.Name -ne 0) {
+	Foreach ($Group in $Regex.Groups)
+	{
+		if ($Group.Name -ne 0)
+		{
 			$ObfuscatedScriptWithoutEndlessLoops += $Group.Value
 		}
 	}
@@ -432,35 +523,41 @@ function RemoveEndlessLoopType1() {
 	return $ObfuscatedScriptWithoutEndlessLoops
 }
 
-function ContainsEndlessLoopType2() {
+function ContainsEndlessLoopType2()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$Regex = [Regex]::Match($ObfuscatedScript, "do\s*\{(.*?)\}\s*(i?)while\s*\(\!\$\{\?\}\)")
-	if($Regex.Success) {
+	if ($Regex.Success)
+	{
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 	
 	return $Found
 }
 
-function RemoveEndlessLoopType2() {
+function RemoveEndlessLoopType2()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$ObfuscatedScriptWithoutEndlessLoops = ""
 	$Regex = [Regex]::Match($ObfuscatedScript, "(.*?)do\s*\{(.*?)\}\s*(i?)while\s*\(\!\$\{\?\}\)(.*?)\z")
-	Foreach($Group in $Regex.Groups) {
-		if($Group.Name -ne 0) {
+	Foreach ($Group in $Regex.Groups)
+	{
+		if ($Group.Name -ne 0)
+		{
 			$ObfuscatedScriptWithoutEndlessLoops += $Group.Value
 		}
 	}
@@ -468,38 +565,46 @@ function RemoveEndlessLoopType2() {
 	return $ObfuscatedScriptWithoutEndlessLoops
 }
 
-function TryCatchBlockExists() {
+function TryCatchBlockExists()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$ObfuscatedScript = $ObfuscatedScript -replace "`t|`n|`r", ""
-	if($ObfuscatedScript -Match "(.*?)(?i)try\s*\{(.*?)\}\s*(?i)catch\s*\{(.*?)\}") {
+	if ($ObfuscatedScript -Match "(.*?)(?i)try\s*\{(.*?)\}\s*(?i)catch\s*\{(.*?)\}")
+	{
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function RemoveTryCatchBlocks() {
+function RemoveTryCatchBlocks()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$ObfuscatedScript = $ObfuscatedScript -replace "`t|`n|`r", ""
 	$RegexMatch = [Regex]::Match($ObfuscatedScript, "(.*?)(?i)try\s*\{(.*?)\}(.*?)\{(.*?)\}(.*)")
-	Foreach($Match in $RegexMatch.Groups) {
-		if($Match.Value -Match "catch" -and $Match.Name -ne 0) {
+	Foreach ($Match in $RegexMatch.Groups)
+	{
+		if ($Match.Value -Match "catch" -and $Match.Name -ne 0)
+		{
 			$CatchCodeBlockIndex = [convert]::ToInt32($Match.Name, 10) + 1
 		}
 	}
-	Foreach($Match in $RegexMatch.Groups) {
-		if($Match.Value -notMatch "try" -and $Match.Value -notMatch "catch" -and $Match.Name -ne 0 -and $Match.Name -ne $CatchCodeBlockIndex) {
+	Foreach ($Match in $RegexMatch.Groups)
+	{
+		if ($Match.Value -notMatch "try" -and $Match.Value -notMatch "catch" -and $Match.Name -ne 0 -and $Match.Name -ne $CatchCodeBlockIndex)
+		{
 			$ObfuscatedScriptWithoutTryCatch = $ObfuscatedScriptWithoutTryCatch + $Match.Value
 		}
 	}
@@ -507,12 +612,13 @@ function RemoveTryCatchBlocks() {
 	return $ObfuscatedScriptWithoutTryCatch
 }
 
-function AddErrorHandlerToObfuscatedScript() {
+function AddErrorHandlerToObfuscatedScript()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscatedScript
-    )
+		[string]$ObfuscatedScript
+	)
 	
 	$ErrorHandler1 = @'
 	try {
@@ -535,43 +641,50 @@ function AddErrorHandlerToObfuscatedScript() {
 	return $ObfuscatedScriptErrorHandled
 }
 
-function ContinueDeobfuscating() {
+function ContinueDeobfuscating()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$DeobfuscationProcess
-    )
+		[string]$DeobfuscationProcess
+	)
 	
-	if($DeobfuscationProcess -eq "ContinueDeobfuscating") {
+	if ($DeobfuscationProcess -eq "ContinueDeobfuscating")
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function DeobfuscateALayer() {
+function DeobfuscateALayer()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$Deobfuscator
-    )
+		[string]$Deobfuscator
+	)
 	
 	$DeobfuscationOutput = (powershell $Deobfuscator)
 	
 	return $DeobfuscationOutput
 }
 
-function ThereIsAnErrorDuringScriptExecution() {
+function ThereIsAnErrorDuringScriptExecution()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [array]$DeobfuscationOutput
-    )
+		[array]$DeobfuscationOutput
+	)
 	
 	$ErrorFound = $False
-	Foreach($Element in $DeobfuscationOutput) {
-		if($Element -Match "executionError" -or $Element -Match "connectionError") {
+	Foreach ($Element in $DeobfuscationOutput)
+	{
+		if ($Element -Match "executionError" -or $Element -Match "connectionError")
+		{
 			$ErrorFound = $True
 		}
 	}
@@ -579,22 +692,27 @@ function ThereIsAnErrorDuringScriptExecution() {
 	return $ErrorFound
 }
 
-function GetErrorInfoFromOutput() {
+function GetErrorInfoFromOutput()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [array]$DeobfuscationOutput
-    )
+		[array]$DeobfuscationOutput
+	)
 	
 	$ErrorFound = $False
 	$ErrorMessage = ""
 	$ErrorType = ""
-	Foreach($Element in $DeobfuscationOutput) {
-		if($ErrorFound) {
+	Foreach ($Element in $DeobfuscationOutput)
+	{
+		if ($ErrorFound)
+		{
 			$ErrorMessage += "$($Element)`n"
 		}
-		else {
-			if($Element -Match "executionError" -or $Element -Match "connectionError") {
+		else
+		{
+			if ($Element -Match "executionError" -or $Element -Match "connectionError")
+			{
 				$ErrorType = $Element
 				$ErrorFound = $True
 			}
@@ -604,47 +722,55 @@ function GetErrorInfoFromOutput() {
 	return @($ErrorType, $ErrorMessage)
 }
 
-function IsAnArray() {
+function IsAnArray()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [array]$DeobfuscationOutput
-    )
+		[array]$DeobfuscationOutput
+	)
 	
-	if($DeobfuscationOutput -is [array]) {
+	if ($DeobfuscationOutput -is [array])
+ {
 		return $True
 	}
-	else {
+	else
+	{
 		return $False
 	}
 }
 
-function FromArrayToString() {
+function FromArrayToString()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [array]$DeobfuscationOutput
-    )
+		[array]$DeobfuscationOutput
+	)
 	
 	$String = ""
-	Foreach($Element in $DeobfuscationOutput) {
+	Foreach ($Element in $DeobfuscationOutput)
+	{
 		$String = $String + $Element
 	}
 	
 	return $String
 }
 
-function ScriptIsObfuscated() {
+function ScriptIsObfuscated()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$Script
-    )
+		[string]$Script
+	)
 	
 	$Found = $False
-	Foreach($Line in $Script.Split("`n")) {
+	Foreach ($Line in $Script.Split("`n"))
+	{
 		$Regex = [Regex]::Match($Script, "(\{\d\}\'\s*-f)|(\'(.*?)\'\s*\+\s*\'(.*?)\')")
-		if($Regex.Success) {
+		if ($Regex.Success)
+		{
 			$Found = $True
 		}
 	}
@@ -652,15 +778,17 @@ function ScriptIsObfuscated() {
 	return $Found
 }
 
-function DeobfuscateScript() {
-    param(
-        [Parameter(
+function DeobfuscateScript()
+{
+	param(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$Script
-    )
+		[string]$Script
+	)
 	
 	$Regex = [Regex]::Match($Script, "(\'|\"")\{(.*?)\}(\'|\"")\s*-f")
-	if($Regex.Success) {
+	if ($Regex.Success)
+	{
 		$Script = RemoveStringFormatting $Script
 	}
 	
@@ -670,12 +798,13 @@ function DeobfuscateScript() {
 	return $Script
 }
 
-function RemoveStringFormatting() {
+function RemoveStringFormatting()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$Script
-    )
+		[string]$Script
+	)
 	
 	<#
 	.DESCRIPTION
@@ -688,7 +817,8 @@ function RemoveStringFormatting() {
 	$NewScript = ""
 	
 	$Regex = [Regex]::Matches($Script, "(.*?)\(\'\{(.*?)\}\'\s*-f\s*(\'\"")(.*?)(\'|\"")\)")
-	Foreach($Match in $Regex) {
+	Foreach ($Match in $Regex)
+	{
 		$FormattedStringPositionsPart = "{$($Match.Groups[2].Value)}"
 		$FormattedStringWordsPart = "'$($Match.Groups[3].Value)'"
 		$FormattedString = RemoveOneStringFormatting $FormattedStringPositionsPart $FormattedStringWordsPart
@@ -702,13 +832,14 @@ function RemoveStringFormatting() {
 	return $Script
 }
 
-function RemoveOneStringFormatting() {
+function RemoveOneStringFormatting()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$FormattedStringPositionsPart,
+		[string]$FormattedStringPositionsPart,
 		[string]$FormattedStringWordsPart
-    )
+	)
 	
 	<#
 	.DESCRIPTION
@@ -728,19 +859,21 @@ function RemoveOneStringFormatting() {
 	$FormattedStringWords = GetFormattingStringWords $RegexWords
 	
 	$originalString = ""
-	For($pos = 0; $pos -lt $FormattedStringWords.Length; $pos++) {
+	For ($pos = 0; $pos -lt $FormattedStringWords.Length; $pos++)
+	{
 		$originalString += $FormattedStringWords[$FormattedStringWordsPositions[$pos]]
 	}
 	
 	return $originalString
 }
 
-function GetFormattingStringPositions() {
+function GetFormattingStringPositions()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
 		[array]$RegexPositions
-    )
+	)
 	
 	<#
 	.DESCRIPTION
@@ -751,9 +884,12 @@ function GetFormattingStringPositions() {
 	#>
 	
 	$FormattedStringWordsPositions = @()
-	Foreach($Match in $RegexPositions) {
-		Foreach($Group in $Match.Groups) {
-			if($Group.Name -ne 0) {
+	Foreach ($Match in $RegexPositions)
+	{
+		Foreach ($Group in $Match.Groups)
+		{
+			if ($Group.Name -ne 0)
+			{
 				$FormattedStringWordsPositions += $Group.Value
 			}
 		}
@@ -762,12 +898,13 @@ function GetFormattingStringPositions() {
 	return $FormattedStringWordsPositions
 }
 
-function GetFormattingStringWords() {
+function GetFormattingStringWords()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
 		[array]$RegexWords
-    )
+	)
 	
 	<#
 	.DESCRIPTION
@@ -778,9 +915,12 @@ function GetFormattingStringWords() {
 	#>
 	
 	$FormattedStringWords = @()
-	Foreach($Match in $RegexWords) {
-		Foreach($Group in $Match.Groups) {
-			if($Group.Name -ne 0) {
+	Foreach ($Match in $RegexWords)
+	{
+		Foreach ($Group in $Match.Groups)
+		{
+			if ($Group.Name -ne 0)
+			{
 				$FormattedStringWords += $Group.Value
 			}
 		}
@@ -789,30 +929,33 @@ function GetFormattingStringWords() {
 	return $FormattedStringWords
 }
 
-function GetObfuscationLayers() {
+function GetObfuscationLayers()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $False)]
-        [array]$ObfuscationLayers
-    )
+		[array]$ObfuscationLayers
+	)
 	
-	ForEach ($Layer in $ObfuscationLayers) {
-		$Heading = "#"*30 + " Layer " + ($ObfuscationLayers.IndexOf($Layer) + 1) + " " + "#"*30
+	ForEach ($Layer in $ObfuscationLayers)
+ {
+		$Heading = "#" * 30 + " Layer " + ($ObfuscationLayers.IndexOf($Layer) + 1) + " " + "#" * 30
 		$ScriptOutput = "$($ScriptOutput)$($Heading)`n$($Layer)`n"
 	}
 	
 	return $ScriptOutput
 }
 
-function FormatSyntaxErrorOutput() {
+function FormatSyntaxErrorOutput()
+{
 	param(
 		[Parameter(
 			Mandatory = $True)]
 		[string]$ScriptWithSyntaxErrors,
-        [Parameter(
+		[Parameter(
 			Mandatory = $False)]
-        [string]$ObfuscationLayersOutput
-    )
+		[string]$ObfuscationLayersOutput
+	)
 	
 	<#
 	.DESCRIPTION
@@ -823,26 +966,29 @@ function FormatSyntaxErrorOutput() {
 	Output with specific format.
 	#>
 	
-	$Heading = "#"*30 + " Syntax error " + "#"*30
-	if($ObfuscationLayersOutput -eq "") {
+	$Heading = "#" * 30 + " Syntax error " + "#" * 30
+	if ($ObfuscationLayersOutput -eq "")
+	{
 		$Output = "$($Heading)`n$($ScriptWithSyntaxErrors)"
 	}
-	else {
+	else
+	{
 		$Output = "$($ObfuscationLayersOutput)`n$($Heading)`n$($ScriptWithSyntaxErrors)"
 	}
 	
 	return $Output
 }
 
-function FormatMalwareCodeOutput() {
+function FormatMalwareCodeOutput()
+{
 	param(
-        [Parameter(
-			Mandatory = $True)]
-        [string]$ObfuscationLayersOutput,
 		[Parameter(
 			Mandatory = $True)]
-        [string]$Url
-    )
+		[string]$ObfuscationLayersOutput,
+		[Parameter(
+			Mandatory = $True)]
+		[string]$Url
+	)
 	
 	<#
 	.DESCRIPTION
@@ -853,9 +999,10 @@ function FormatMalwareCodeOutput() {
 	Output with specific format.
 	#>
 
-	$Heading = "#"*30 + " Malicious code " + " " + "#"*30
+	$Heading = "#" * 30 + " Malicious code " + " " + "#" * 30
 	$Output = "$($ObfuscationLayersOutput)$($Heading)`nMalware hosting URLs: "
-	ForEach($UrlUp in $UrlsUp) {
+	ForEach ($UrlUp in $UrlsUp)
+	{
 		$Output = "$($Output)$($UrlUp), "
 	}
 	$Output = $Output.Substring(0, $Output.Length - 2)
@@ -863,18 +1010,19 @@ function FormatMalwareCodeOutput() {
 	return $Output
 }
 
-function FormatConnectionErrorOutput() {
+function FormatConnectionErrorOutput()
+{
 	param(
-        [Parameter(
-			Mandatory = $True)]
-        [string]$ObfuscationLayersOutput,
 		[Parameter(
 			Mandatory = $True)]
-        [array]$UrlsDown,
+		[string]$ObfuscationLayersOutput,
+		[Parameter(
+			Mandatory = $True)]
+		[array]$UrlsDown,
 		[Parameter(
 			Mandatory = $False)]
-        [array]$UrlsUp
-    )
+		[array]$UrlsUp
+	)
 	
 	<#
 	.DESCRIPTION
@@ -886,36 +1034,40 @@ function FormatConnectionErrorOutput() {
 	Output with specific format.
 	#>
 	
-	$Heading = "#"*26 + " Connection error " + "#"*26
+	$Heading = "#" * 26 + " Connection error " + "#" * 26
 	$Output = "$($ObfuscationLayersOutput)$($Heading)`nCannot connect to remote malware hosting servers. Remote URLs: "
 	
-	ForEach($UrlDown in $UrlsDown) {
+	ForEach ($UrlDown in $UrlsDown)
+ {
 		$Output = "$($Output)$($UrlDown), "
 	}
 	$Output = $Output.Substring(0, $Output.Length - 2)
-	if($UrlsUp) {
+	if ($UrlsUp)
+	{
 		$Output = "$($Output)`nSome malware hosting servers are active. Remote URLs: "
-		ForEach($UrlUp in $UrlsUp) {
+		ForEach ($UrlUp in $UrlsUp)
+		{
 			$Output = "$($Output)$($UrlUp), "
 		}
 		$Output = $Output.Substring(0, $Output.Length - 2)
 	}
 			
-	return $Output
+	#return $Output
 }
 
-function FormatExecutionErrorOutput() {
+function FormatExecutionErrorOutput()
+{
 	param(
-        [Parameter(
-			Mandatory = $True)]
-        [string]$ObfuscationLayersOutput,
 		[Parameter(
 			Mandatory = $True)]
-        [string]$ErrorMessage,
+		[string]$ObfuscationLayersOutput,
 		[Parameter(
 			Mandatory = $True)]
-        [string]$Script
-    )
+		[string]$ErrorMessage,
+		[Parameter(
+			Mandatory = $True)]
+		[string]$Script
+	)
 	
 	<#
 	.DESCRIPTION
@@ -927,18 +1079,19 @@ function FormatExecutionErrorOutput() {
 	Output with specific format.
 	#>
 
-	$Heading = "#"*30 + " Execution error " + "#"*30
+	$Heading = "#" * 30 + " Execution error " + "#" * 30
 	$Output = "$($ObfuscationLayersOutput)$($Heading)`nObfuscated Script execution error:`n$($ErrorMessage)"
 	
 	return $Output
 }
 
-function FormatNotDeobfuscatedOutput() {
+function FormatNotDeobfuscatedOutput()
+{
 	param(
-        [Parameter(
+		[Parameter(
 			Mandatory = $True)]
-        [string]$ObfuscationLayersOutput
-    )
+		[string]$ObfuscationLayersOutput
+	)
 	
 	<#
 	.DESCRIPTION
@@ -953,126 +1106,188 @@ function FormatNotDeobfuscatedOutput() {
 	return $Output
 }
 
-function PowerDrive {
-    param(
-        [Parameter(
+function PowerDrive
+{
+	param(
+		[Parameter(
 			Mandatory = $True)]
-        [PSObject[]]$InputFile
+		[PSObject[]]$InputFile
 	)
 
 	#Initialize variables
-    $OverriddenFunctions = @()
+	$OverriddenFunctions = @()
 	$OverriddenFunctions += $Invoke_Expression_Override
-	$ObfuscationLayers  = New-Object System.Collections.Generic.List[System.Object]
+	$ObfuscationLayers = New-Object System.Collections.Generic.List[System.Object]
 	$DeobfuscationProcess = "ContinueDeobfuscating"
-    $ObfuscatedScript = GetObfuscatedScriptFromFile $InputFile
+	$ObfuscatedScript = GetObfuscatedScriptFromFile $InputFile
 	$ObfuscationLayersOutput = ""
+	$report = [PSCustomObject]@{
+		FileName   = $InputFile[0]
+		LayerCount = 0
+		Layers     = @()
+		Encoded    = $false
+		Sleep      = $false
+		Null       = $false
+		Loop       = $false
+		TryCatch   = $false
+		Download   = $false
+		usesIEX    = $false
+		Process    = $false
+		URLs       = ""
+		URLsActive = ""
+	}
 	
 	#Start deobfuscation process
-	if(IsBase64 $ObfuscatedScript) {
+	if (IsBase64 $ObfuscatedScript)
+	{
 		$ObfuscationLayers.Add($ObfuscatedScript)
 		$ObfuscatedScript = DecodeBase64 $ObfuscatedScript
+		$report.Encoded = $true
 	}
 	$ObfuscatedScriptOriginal = $ObfuscatedScript
 	$ObfuscatedScriptModified = $ObfuscatedScript
 	$ObfuscatedScriptModified = ScriptToOneLine $ObfuscatedScriptModified
 	$ObfuscatedScriptModified = CleanScript $ObfuscatedScriptModified
-	if(!(GoodSyntax $ObfuscatedScriptModified)) {
+	if (!(GoodSyntax $ObfuscatedScriptModified))
+	{
 		$ObfuscationLayersOutput = GetObfuscationLayers $ObfuscationLayers
 		$Output = FormatSyntaxErrorOutput $ObfuscatedScriptOriginal $ObfuscationLayersOutput
 		Write-Output $Output
 		
 		return
 	}
-	if(UsesFileExplorer $ObfuscatedScriptModified) {
+	if (UsesFileExplorer $ObfuscatedScriptModified)
+	{
 		$ObfuscationLayers.Add($ObfuscatedScriptOriginal)
 		$ObfuscationLayersOutput = GetObfuscationLayers $ObfuscationLayers
 		$Urls = ExtractUrls $ObfuscatedScriptModified
-		if(IsUrlActive $Urls[0]) {
+		if (IsUrlActive $Urls[0])
+		{
 			$Output = FormatMalwareCodeOutput $ObfuscationLayersOutput $Urls[0]
 			Write-Output $Output
 		}
-		else {
+		else
+		{
 			$Output = FormatConnectionErrorOutput $ObfuscationLayersOutput $Urls[0] @()
 			Write-Output $Output
 		}
 		
+		report.usesIEX = $true
 		return
 	}
-	if(ContainsSleepCommand $ObfuscatedScriptModified) {
+	if (ContainsSleepCommand $ObfuscatedScriptModified)
+	{
 		$ObfuscatedScriptModified = ReduceSleepCounter $ObfuscatedScriptModified
+		$report.Sleep = $True
 	}
-	if(ThereIsNullOutputRedirection $ObfuscatedScriptModified) {
+	if (ContainsDownload $ObfuscatedScriptModified)
+	{
+		$report.Download = $True
+	}
+	if (ContainsProcess $ObfuscatedScriptModified)
+	{
+		$report.Process = $True
+	}
+	if (ThereIsNullOutputRedirection $ObfuscatedScriptModified)
+	{
 		$ObfuscatedScriptModified = RemoveOutputHiding $ObfuscatedScriptModified
+		$report.Null = $True
 	}
-	if(ContainsEndlessLoopType1 $ObfuscatedScriptModified) {
+	if (ContainsEndlessLoopType1 $ObfuscatedScriptModified)
+	{
 		$ObfuscatedScriptModified = RemoveEndlessLoopType1 $ObfuscatedScriptModified
+		$report.Loop = $True
 	}
-	if(ContainsEndlessLoopType2 $ObfuscatedScriptModified) {
+	if (ContainsEndlessLoopType2 $ObfuscatedScriptModified)
+	{
 		$ObfuscatedScriptModified = RemoveEndlessLoopType2 $ObfuscatedScriptModified
+		$report.Loop = $True
 	}
-	if(TryCatchBlockExists $ObfuscatedScriptModified) {
+	if (TryCatchBlockExists $ObfuscatedScriptModified)
+	{
 		$ObfuscatedScriptWithoutTryCatch = RemoveTryCatchBlocks $ObfuscatedScriptModified
 		$ObfuscatedScriptErrorHandled = AddErrorHandlerToObfuscatedScript $ObfuscatedScriptWithoutTryCatch
 		$Deobfuscator = ($OverriddenFunctions -join "`r`n`r`n") + "`r`n`r`n" + $ObfuscatedScriptErrorHandled
+		$report.TryCatch = $True
 	}
-	else {
+	else
+	{
 		$ObfuscatedScriptErrorHandled = AddErrorHandlerToObfuscatedScript $ObfuscatedScriptModified
 		$Deobfuscator = ($OverriddenFunctions -join "`r`n`r`n") + "`r`n`r`n" + $ObfuscatedScriptErrorHandled
 	}
  
-	while(ContinueDeobfuscating $DeobfuscationProcess) {
+	while (ContinueDeobfuscating $DeobfuscationProcess)
+ {
 		$ObfuscationLayers.Add($ObfuscatedScriptOriginal)
-        $DeobfuscationOutput = DeobfuscateALayer $Deobfuscator
-		if(!$DeobfuscationOutput) {
+		$DeobfuscationOutput = DeobfuscateALayer $Deobfuscator
+		if (!$DeobfuscationOutput)
+		{
 			$DeobfuscationProcess = "StopDeobfuscating"
 		}
-		else {
-			if(ThereIsAnErrorDuringScriptExecution $DeobfuscationOutput) {
+		else
+		{
+			if (ThereIsAnErrorDuringScriptExecution $DeobfuscationOutput)
+			{
+				$report.LayerCount = $ObfuscationLayers.Count
+				$report.Layers = $ObfuscationLayers
 				$ErrorOutput = GetErrorInfoFromOutput $DeobfuscationOutput
 				$ErrorType = $ErrorOutput | Select-Object -Index 0
-				if(ScriptIsObfuscated $ObfuscatedScriptModified) {
+				if (ScriptIsObfuscated $ObfuscatedScriptModified)
+				{
 					$ObfuscatedScriptModified = DeobfuscateScript $ObfuscatedScriptModified
 					$ObfuscationLayers.Add($ObfuscatedScriptModified)
 				}
 				$ObfuscationLayersOutput = GetObfuscationLayers $ObfuscationLayers
-				if($ErrorType -eq "executionError") {
+				if ($ErrorType -eq "executionError")
+				{
 					$ErrorMessage = $ErrorOutput | Select-Object -Index 1
 					$Output = FormatExecutionErrorOutput $ObfuscationLayersOutput $ErrorMessage $ObfuscationLayers[-1]
 					Write-Output $Output
-				
 					return
 				}
-				else {
-					if(ThereIsNullOutputRedirection $ObfuscatedScriptModified) {
+				else
+				{
+					if (ThereIsNullOutputRedirection $ObfuscatedScriptModified)
+					{
 						$ObfuscatedScriptModified = RemoveOutputHiding $ObfuscatedScriptModified
 					}
 					$Urls = ExtractUrls $ObfuscatedScriptModified
-					if($Urls) {
+					if ($Urls)
+					{
 						$UrlsDown = @()
 						$UrlsUp = @()
-						ForEach($Url in $Urls) {
-							if(IsUrlActive $Url) {
+						ForEach ($Url in $Urls)
+						{
+							if (IsUrlActive $Url)
+							{
 								$UrlsUp += $Url
 							}
-							else {
+							else
+							{
 								$UrlsDown += $Url
 							}
 						}
+						$report.URLs = $urls
+						$report.URLsActive = $UrlsUp
 						$Output = FormatConnectionErrorOutput $ObfuscationLayersOutput $UrlsDown $UrlsUp
 						Write-Output $Output
+						Write-Output $report
 					}
-					else {
+					else
+					{
 						$ErrorMessage = "URLs with bad syntax."
 						$Output = FormatExecutionErrorOutput $ObfuscationLayersOutput $ErrorMessage $ObfuscationLayers[-1]
 						Write-Output $Output
+						Write-Output $report
 					}
 				
 					return
 				}
 			}
-			else {
-				if($DeobfuscationOutput -ne "") {
+			else
+			{
+				if ($DeobfuscationOutput -ne "")
+				{
 					$OutputArray = $DeobfuscationOutput.split("**", [System.StringSplitOptions]::RemoveEmptyEntries).Trim()
 					$ObfuscatedScript = $OutputArray | Select-Object -Index 0
 					$DeobfuscationProcess = $OutputArray | Select-Object -Index 1
@@ -1080,48 +1295,71 @@ function PowerDrive {
 					$ObfuscatedScriptModified = $ObfuscatedScript
 					$ObfuscatedScriptModified = ScriptToOneLine $ObfuscatedScriptModified
 					$ObfuscatedScriptModified = CleanScript $ObfuscatedScriptModified
-					if(!(GoodSyntax $ObfuscatedScriptModified)) {
+					if (!(GoodSyntax $ObfuscatedScriptModified))
+					{
 						$ObfuscationLayersOutput = GetObfuscationLayers $ObfuscationLayers
 						$Output = FormatSyntaxErrorOutput $ObfuscatedScriptOriginal $ObfuscationLayersOutput
 						Write-Output $Output
 		
 						return
 					}
-					if(UsesFileExplorer $ObfuscatedScriptModified) {
+					if (UsesFileExplorer $ObfuscatedScriptModified)
+					{
 						$ObfuscationLayers.Add($ObfuscatedScriptOriginal)
 						$ObfuscationLayersOutput = GetObfuscationLayers $ObfuscationLayers
 						$Urls = ExtractUrls $ObfuscatedScriptModified
-						if(IsUrlActive $Urls[0]) {
+						if (IsUrlActive $Urls[0])
+						{
 							$Output = FormatMalwareCodeOutput $ObfuscationLayersOutput $Urls[0]
 							Write-Output $Output
 						}
-						else {
+						else
+						{
 							$Output = FormatConnectionErrorOutput $ObfuscationLayersOutput $Urls[0] @()
 							Write-Output $Output
 						}
 						
 						return
 					}
-					if(ContainsSleepCommand $ObfuscatedScriptModified) {
+					if (ContainsSleepCommand $ObfuscatedScriptModified)
+					{
 						$ObfuscatedScriptModified = ReduceSleepCounter $ObfuscatedScriptModified
+						$report.Sleep = $True
 					}
-					if(ThereIsNullOutputRedirection $ObfuscatedScriptModified) {
+					if (ThereIsNullOutputRedirection $ObfuscatedScriptModified)
+					{
 						$ObfuscatedScriptModified = RemoveOutputHiding $ObfuscatedScriptModified
+						$report.Null = $True
 					}
-					if(ContainsEndlessLoopType1 $ObfuscatedScriptModified) {
+					if (ContainsDownload $ObfuscatedScriptModified)
+					{
+						$report.Download = $True
+					}
+					if (ContainsProcess $ObfuscatedScriptModified)
+					{
+						$report.Process = $True
+					}
+					if (ContainsEndlessLoopType1 $ObfuscatedScriptModified)
+					{
 						$ObfuscatedScriptModified = RemoveEndlessLoopType1 $ObfuscatedScriptModified
+						$report.Loop = $True
 					}
-					if(ContainsEndlessLoopType2 $ObfuscatedScriptModified) {
+					if (ContainsEndlessLoopType2 $ObfuscatedScriptModified)
+					{
 						$ObfuscatedScriptModified = RemoveEndlessLoopType2 $ObfuscatedScriptModified
+						$report.Loop = $True
 					}
-					if(TryCatchBlockExists $ObfuscatedScriptModified) {
+					if (TryCatchBlockExists $ObfuscatedScriptModified)
+					{
 						$ObfuscatedScriptWithoutTryCatch = RemoveTryCatchBlocks $ObfuscatedScriptModified
 						$ObfuscatedScriptErrorHandled = AddErrorHandlerToObfuscatedScript $ObfuscatedScriptWithoutTryCatch
-						$Deobfuscator = ($OverriddenFunctions -join "`r`n`r`n") + "`r`n`r`n" + ($ObfuscatedScriptErrorHandled -replace('"', '\"'))
+						$Deobfuscator = ($OverriddenFunctions -join "`r`n`r`n") + "`r`n`r`n" + ($ObfuscatedScriptErrorHandled -replace ('"', '\"'))
+						$report.TryCatch = $True
 					}
-					else {
+					else
+					{
 						$ObfuscatedScriptErrorHandled = AddErrorHandlerToObfuscatedScript $ObfuscatedScriptModified
-						$Deobfuscator = ($OverriddenFunctions -join "`r`n`r`n") + "`r`n`r`n" + ($ObfuscatedScriptErrorHandled -replace('"', '\"'))
+						$Deobfuscator = ($OverriddenFunctions -join "`r`n`r`n") + "`r`n`r`n" + ($ObfuscatedScriptErrorHandled -replace ('"', '\"'))
 					}
 				}
 			}
@@ -1130,39 +1368,54 @@ function PowerDrive {
 	
 	#Last Layer of offuscation
 	$ObfuscatedScript = $ObfuscationLayers[-1]
-	if(ScriptIsObfuscated $ObfuscatedScript) {
+	if (ScriptIsObfuscated $ObfuscatedScript)
+	{
 		$ObfuscatedScript = DeobfuscateScript $ObfuscatedScript
 		$ObfuscationLayers.Add($ObfuscatedScript)
 	}
-	if(ThereIsNullOutputRedirection $ObfuscatedScript) {
+	if (ThereIsNullOutputRedirection $ObfuscatedScript)
+	{
 		$ObfuscatedScript = RemoveOutputHiding $ObfuscatedScript
 	}
 	$ObfuscationLayersOutput = GetObfuscationLayers $ObfuscationLayers
 	$Urls = ExtractUrls $ObfuscatedScript
 	$UrlsDown = @()
 	$UrlsUp = @()
-	ForEach($Url in $Urls) {
-		if(IsUrlActive $Url) {
+	ForEach ($Url in $Urls)
+	{
+		if (IsUrlActive $Url)
+		{
 			$UrlsUp += $Url
 		}
-		else {
+		else
+		{
 			$UrlsDown += $Url
 		}
 	}
-	if($Urls) {
-		if($UrlsDown) {
+	$report.URLs = $urls
+	$report.URLsActive = $UrlsUp
+	if ($Urls)
+	{
+		if ($UrlsDown)
+		{
 			$Output = FormatConnectionErrorOutput $ObfuscationLayersOutput $UrlsDown $UrlsUp
 			Write-Output $Output
 		}
-		else {
+		else
+		{
 			$Output = FormatMalwareCodeOutput $ObfuscationLayersOutput $Urls[0]
 			Write-Output $Output
 		}
 	}
-	else {
+	else
+	{
 		$Output = FormatNotDeobfuscatedOutput $ObfuscationLayersOutput
 		Write-Output $Output
 	}
+
+	$report.LayerCount = $ObfuscationLayers.Count
+	$report.Layers = $ObfuscationLayers
+	Write-Output $report
 	
 	return
 }
