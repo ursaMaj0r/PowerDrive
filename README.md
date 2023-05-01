@@ -16,4 +16,4 @@ Obfuscation is a technique used by malicious software to avoid detection. This t
 ## Additional information
 This tool has been adapted from [1] by Jeff Malavasi in the context of repurposing the module for bulk detection and SIEM ingestion. An additional script was created that can be used to scan directories for potentially obfuscated scripts and log to a file directory. This file can be later picked up by a SIEM for alerting and monitoring across the enterprise.
 
-[1] Denis Ugarte, Davide Maiorca, Fabrizio Cara and Giorgio Giacinto. PowerDrive: Accurate De-Obfuscation and Analysis of PowerShell Malware. To appear in the 16th Conference on Detection of Intrusions and Malware & Vulnerability Assessment (DIMVA), Gotheborg, Sweden, 2019. 
+[1] Denis Ugarte, Davide Maiorca, Fabrizio Cara and Giorgio Giacinto. PowerDrive: Accurate De-Obfuscation and Analysis of PowerShell Malware.
