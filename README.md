@@ -15,6 +15,8 @@ Obfuscation is a technique used by malicious software to avoid detection. This t
 
 ## Added Functions
 ### New-PowerDriveSamples
+Converts the deobfuscated text file into individual PowerShell Scripts.
+
 1. Open a new PowerShell instance.
 2. Import the function:
 > ./New-PowerDriveSamples.ps1
@@ -22,6 +24,8 @@ Obfuscation is a technique used by malicious software to avoid detection. This t
 > New-PowerDriveSamples -InputFile {Path to deobfuscated samples file} -outputDir {path to directory to place scripts}
 
 ### Invoke-PowerDriveAnalysis
+Scans a directory for all PowerShell scripts and runs a PowerDrive analysis. Results are stored in a CSV file for bulk analysis.
+
 1. Open a PowerShell instance with the PowerDrive Module imported.
 2. Import the function:
 > ./Invoke-PowerDriveAnalysis.ps1
